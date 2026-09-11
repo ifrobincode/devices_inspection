@@ -26,8 +26,8 @@ devices_inspection.py —— 网络设备自动化巡检脚本
     4. 巡检结果将保存至当天日期命名的文件夹中。
 
          Author: Robin
-  Creation Date: 2023.12.25
-        Version: v2026.03.24
+  Creation Date: 2023-12-25
+        Version: v20260911
 """
 
 import os
@@ -44,7 +44,7 @@ from contextlib import contextmanager
 
 FILENAME = input(f"\n请输入info文件名（默认为 info.xlsx）：") or "info.xlsx"  # 指定info文件名称
 INFO_PATH = os.path.join(os.getcwd(), FILENAME)  # 读取info文件路径
-LOCAL_TIME = time.strftime('%Y.%m.%d', time.localtime())  # 读取当前日期
+LOCAL_TIME = time.strftime('%Y-%m-%d', time.localtime())  # 读取当前日期
 LOCK = threading.Lock()  # 线程锁实例化
 POOL = threading.BoundedSemaphore(200)  # 最大线程控制
 
