@@ -27,7 +27,6 @@ devices_inspection.py —— 网络设备自动化巡检脚本
 
          Author: Robin
   Creation Date: 2023-12-25
-        Version: v20260911
 """
 
 import os
@@ -41,10 +40,12 @@ from io import BytesIO
 from netmiko import ConnectHandler
 from netmiko import exceptions
 from contextlib import contextmanager
+from pathlib import Path
 
-FILENAME = input(f"\n请输入info文件名（默认为 info.xlsx）：") or "info.xlsx"  # 指定info文件名称
-INFO_PATH = os.path.join(os.getcwd(), FILENAME)  # 读取info文件路径
-LOCAL_TIME = time.strftime('%Y-%m-%d', time.localtime())  # 读取当前日期
+DEFAULT_INFO_NAME = "info.xlsx"  # info 文件默认文件名
+INFO_EXTENSION = ".xlsx"  # nfo 文件扩展名
+SCRIPT_DIR = Path(__file__).resolve().parent  # 获取当前 Python 脚本所在目录
+LOCAL_TIME = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime())  # 读取当前日期和时间
 LOCK = threading.Lock()  # 线程锁实例化
 POOL = threading.BoundedSemaphore(200)  # 最大线程控制
 
@@ -77,12 +78,71 @@ def suppress_stderr():
             sys.stderr = old_stderr
 
 
+# 规范化文件名
+def normalize_filename(
+        user_input: str,
+        default_name: str,
+        extension: str,
+) -> str:
+    """
+    规范化用户输入的文件名。
+
+    支持：
+        带后缀：info.xlsx
+        不带后缀：info
+
+    如果直接回车，使用默认文件名；
+    如果用户已经输入正确扩展名，则不重复添加扩展名。
+    """
+    value = user_input.strip()  # 删除用户输入文件名前后的空白字符
+
+    if not value:  # 判断用户是否直接按下Enter
+        return default_name  # 空输入时返回默认文件名
+
+    if value.lower().endswith(extension.lower()):  # 判断是否已经包含正确的扩展名
+        return value  # 已包含扩展名时直接返回
+
+    return f"{value}{extension}"  # 未包含扩展名时自动追加扩展名
+
+
+def prompt_for_info_file() -> Path:
+    """
+    让用户输入 info 文件名，并检查文件是否存在。
+
+    用户可以输入：
+        info
+        info.xlsx
+
+    如果输入的文件不存在，则重新提示用户输入文件名。
+    """
+    while True:  # 持续提示用户，直到找到有效的 info 文件
+        info_input = input(  # 获取用户输入的 info 文件名
+            f"\n请输入info文件名（默认：{DEFAULT_INFO_NAME}）："
+        )
+
+        info_name = normalize_filename(  # 规范化用户输入的文件名
+            info_input,
+            DEFAULT_INFO_NAME,
+            INFO_EXTENSION,
+        )
+
+        info_path = SCRIPT_DIR / info_name  # 将脚本目录与规范化后的文件名拼接
+
+        if info_path.is_file():  # 检查 info 文件是否真实存在
+            return info_path  # 返回有效的 info 文件路径
+
+        print(f"\n[ERROR] info文件不存在：{info_path}")  # 提示用户文件不存在
+        print("请重新输入。")  # 提示用户重新输入文件名
+
+
+
+
 # 判断info文件是否被加密，使用不同的读取方式
-def read_info():
-    if is_encrypted(INFO_PATH):
-        return read_encrypted_file(INFO_PATH)  # 读取被加密info文件
+def read_info(info_path: Path):
+    if is_encrypted(info_path):
+        return read_encrypted_file(info_path)  # 读取被加密info文件
     else:
-        return read_unencrypted_file(INFO_PATH)  # 读取未加密info文件
+        return read_unencrypted_file(info_path)  # 读取未加密info文件
 
 
 # 检测info文件是否被加密
@@ -248,7 +308,8 @@ def inspection(login_info, cmds_dict):
 if __name__ == '__main__':
     t1 = time.time()  # 程序执行计时起始点
     threading_list = []  # 创建一个线程列表，准备存放所有线程
-    devices_info, cmds_info = read_info()  # 读取info文件，获取设备登录信息和命令信息
+    INFO_PATH = prompt_for_info_file()  # 在函数定义完成后获取并验证 info 文件路径
+    devices_info, cmds_info = read_info(INFO_PATH)  # 读取info文件，获取设备登录信息和命令信息
 
     print(f'\n巡检开始...')  # 提示巡检开始
     print(f'\n' + '>' * 40 + '\n')  # 打印一行“>”，隔开巡检提示信息
